@@ -20,19 +20,13 @@ jobs:
       - name: Install ffmpeg
         run: sudo apt-get update && sudo apt-get install -y ffmpeg
 
-      - name: Install cookie plugin + export cookies
+      - name: Setup cookies from secret
         env:
-          EMAIL: ${{ secrets.GOOGLE_EMAIL }}
-          PASS:  ${{ secrets.GOOGLE_PASSWORD }}
+          YOUTUBE_COOKIES: ${{ secrets.YOUTUBE_COOKIES }}
         run: |
-          pip install yt-dlp[default]  # brings in 'curl_cffi' cookie helper
-          # one-shot login + cookie jar
-          yt-dlp --username "$EMAIL" --password "$PASS" \
-                 --cookies cookies.txt \
-                 --no-download \
-                 https://www.youtube.com
-          # if you have 2-Step-Verification, append:
-          # --twofactor <code>
+          pip install yt-dlp[default]
+          # Write cookies from secret to file
+          echo "$YOUTUBE_COOKIES" > cookies.txt
           echo "✅ cookies.txt ready"
 
       - name: Install Python deps
