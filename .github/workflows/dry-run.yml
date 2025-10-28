@@ -1,0 +1,100 @@
+name: "🔍 Dry-run test (APIs + Telegram)"
+
+on:
+  workflow_dispatch:   # manual button only
+  # (remove this line after you are satisfied)
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with: { python-version: "3.11" }
+
+      - name: Install deps
+        run: pip install python-telegram-bot google-api-python-client
+
+      - name: Test TELEGRAM bot
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          CHAT_ID: ${{ secrets.CHAT_ID }}
+        run: |
+          python - << 'PY'
+          import os, datetime
+          from telegram import Bot
+          bot = Bot(os.getenv("BOT_TOKEN"))
+          chat = os.getenv("CHAT_ID")
+          bot.send_message(chat,
+              f"✅ GitHub → Telegram OK  \n"
+              f"Time (IST): {datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M')}  \n"
+              f"Repo: ${{ github.repository }}  \n"
+              f"Branch: ${{ github.ref_name }}",
+              parse_mode="HTML")
+          print("🟢 Telegram test passed")
+          PY
+
+      - name: Test YOUTUBE Data API
+        env:
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          CHANNEL_ID: ${{ secrets.CHANNEL_ID }}
+        run: |
+          python - << 'PY'
+          import os, sys
+          from googleapiclient.discovery import build
+          youtube = build("youtube", "v3", developerKey=os.getenv("YOUTUBE_API_KEY"))
+          req = youtube.search().list(
+              part="snippet",
+              channelId=os.getenv("CHANNEL_ID"),
+              eventType="completed",
+              type="video",
+              order="date",
+              maxResults=1
+          )
+          res = req.execute()
+          if not res["items"]:
+              print("🟡 No ended live-stream found right now (API key works)")
+          else:
+              v = res["items"][0]
+              print("🟢 YouTube API OK")
+              print("Latest ended live:")
+              print("  videoId :", v["id"]["videoId"])
+              print("  title   :", v["snippet"]["title"])
+          PY
+
+      - name: Test yt-dlp + 720p size estimate
+        env:
+          CHANNEL_ID: ${{ secrets.CHANNEL_ID }}
+        run: |
+          # install yt-dlp
+          sudo apt-get update && sudo apt-get install -y ffmpeg
+          pip install yt-dlp
+          # pick the newest ended live (same as above)
+          VIDEO_ID=$(python - << 'PY' | tail -1
+          import os, subprocess, json
+          ch = os.getenv("CHANNEL_ID")
+          out = subprocess.check_output([
+              "yt-dlp", "-j", "--flat-playlist",
+              "https://www.youtube.com/channel/"+ch+"/streams"
+          ], text=True)
+          print(json.loads(out.splitlines()[0])["id"])
+          PY
+          )
+          echo "Testing video-id: $VIDEO_ID"
+          yt-dlp -f "bestvideo[height<=720]+bestaudio[ext=m4a]/best[height<=720]" \
+                 --print "%(filesize_approx)s" \
+                 --skip-download \
+                 "https://www.youtube.com/watch?v=$VIDEO_ID" | tee size.txt
+          SIZE=$(cat size.txt)
+          echo "Estimated 720p size: $SIZE bytes"
+          # convert to MB
+          MB=$(( SIZE / 1024 / 1024 ))
+          echo "Estimated size: ${MB} MB"
+          if [ $MB -gt 1900 ]; then
+            echo "::error::Video > 1.9 GB - will abort in real workflow"
+            exit 1
+          fi
+          echo "🟢 Size check passed (< 2 GB)"
