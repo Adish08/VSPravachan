@@ -1,0 +1,33 @@
+name: "Archive ended YouTube live-stream → Telegram"
+
+on:
+  schedule:
+    # 6 AM – 12 PM IST  (UTC+5:30)  →  00,30 0-6 UTC
+    - cron: "0,30 0-6 * * *"
+  workflow_dispatch:   # manual button
+
+jobs:
+  archive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with: { python-version: "3.11" }
+
+      - name: Setup yt-dlp + FFmpeg
+        uses: AnimMouse/setup-yt-dlp@v3
+        with: { ffmpeg: true }
+
+      - name: Install Python deps
+        run: pip install python-telegram-bot google-api-python-client
+
+      - name: Download & Upload
+        env:
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          CHAT_ID: ${{ secrets.CHAT_ID }}
+          CHANNEL_ID: ${{ secrets.CHANNEL_ID }}
+        run: python archive.py
