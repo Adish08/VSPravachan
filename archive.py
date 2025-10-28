@@ -34,9 +34,8 @@ def download_audio(video_id, title):
         "-f", "bestaudio/best",
         "-x",  # extract audio
         "--audio-format", "m4a",
-        "--audio-quality", "32k",
-        "--postprocessor-args", "ffmpeg:-b:a 32k",
-        "-o", "audio.%(ext)s",  # let yt-dlp handle extension during conversion
+        "--postprocessor-args", "ffmpeg:-ac 1 -ar 22050 -b:a 24k",  # mono, 22kHz, 24kbps
+        "-o", "audio.%(ext)s",
         "--no-progress",
         f"https://www.youtube.com/watch?v={video_id}"
     ]
@@ -44,8 +43,8 @@ def download_audio(video_id, title):
     # After post-processing, the file will be audio.m4a
     sz = os.path.getsize(outfile) / 1024 / 1024
     logging.info("file size: %.1f MB", sz)
-    if sz > 45:
-        raise RuntimeError("audio > 45 MB – aborting to stay under Telegram bot limit")
+    if sz > 48:
+        raise RuntimeError("audio > 48 MB – aborting to stay under Telegram bot limit")
     return outfile
 
 async def send_telegram(file_path, title, descr):
