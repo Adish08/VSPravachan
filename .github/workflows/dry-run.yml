@@ -24,17 +24,21 @@ jobs:
           CHAT_ID: ${{ secrets.CHAT_ID }}
         run: |
           python - << 'PY'
-          import os, datetime
+          import os, datetime, asyncio
           from telegram import Bot
-          bot = Bot(os.getenv("BOT_TOKEN"))
-          chat = os.getenv("CHAT_ID")
-          bot.send_message(chat,
-              f"✅ GitHub → Telegram OK  \n"
-              f"Time (IST): {datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M')}  \n"
-              f"Repo: ${{ github.repository }}  \n"
-              f"Branch: ${{ github.ref_name }}",
-              parse_mode="HTML")
-          print("🟢 Telegram test passed")
+          
+          async def send_test():
+              bot = Bot(os.getenv("BOT_TOKEN"))
+              chat = os.getenv("CHAT_ID")
+              await bot.send_message(chat,
+                  f"✅ GitHub → Telegram OK  \n"
+                  f"Time (IST): {datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M')}  \n"
+                  f"Repo: ${{ github.repository }}  \n"
+                  f"Branch: ${{ github.ref_name }}",
+                  parse_mode="HTML")
+              print("🟢 Telegram test passed")
+          
+          asyncio.run(send_test())
           PY
 
       - name: Test YOUTUBE Data API
