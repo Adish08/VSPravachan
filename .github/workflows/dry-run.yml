@@ -18,6 +18,14 @@ jobs:
       - name: Install deps
         run: pip install python-telegram-bot google-api-python-client packaging
 
+      - name: Check bot rights in group
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          CHAT_ID: ${{ secrets.CHAT_ID }}
+        run: |
+          curl -s "https://api.telegram.org/bot${BOT_TOKEN}/getChat?chat_id=${CHAT_ID}" | jq .
+          curl -s "https://api.telegram.org/bot${BOT_TOKEN}/getChatMember?chat_id=${CHAT_ID}&user_id=@YourBot" | jq .
+
       - name: Test TELEGRAM bot
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
