@@ -26,13 +26,15 @@ def get_latest_ended_live():
         return v["id"]["videoId"], v["snippet"]["title"], v["snippet"]["description"]
     return None
 
-def download_720p(video_id, title):
-    outfile = "video.mp4"
+def download_audio(video_id, title):
+    outfile = "audio.m4a"
     cmd = [
         "yt-dlp",
         "--cookies", "cookies.txt",
-        "-f", "bestvideo[height<=720]+bestaudio[ext=m4a]/best[height<=720]",
-        "--merge-output-format", "mp4",
+        "-f", "bestaudio",
+        "--extract-audio",
+        "--audio-format", "m4a",
+        "--audio-quality", "32k",
         "-o", outfile,
         "--no-progress",
         f"https://www.youtube.com/watch?v={video_id}"
@@ -40,8 +42,8 @@ def download_720p(video_id, title):
     subprocess.run(cmd, check=True)
     sz = os.path.getsize(outfile) / 1024 / 1024
     logging.info("file size: %.1f MB", sz)
-    if sz > 1900:
-        raise RuntimeError("video > 1.9 GB – aborting to avoid artifact limit")
+    if sz > 45:
+        raise RuntimeError("audio > 45 MB – aborting to stay under Telegram bot limit")
     return outfile
 
 async def send_telegram(file_path, title, descr):
@@ -49,8 +51,9 @@ async def send_telegram(file_path, title, descr):
     if len(descr) > 900:
         descr = descr[:900] + "…"
     with open(file_path, "rb") as fh:
-        await bot.send_video(CHAT_ID, video=fh,
-                             caption=f"<b>{title}</b>\n\n{descr}",
+        await bot.send_audio(CHAT_ID, audio=fh,
+                             title=title,
+                             caption=descr,
                              parse_mode="HTML",
                              read_timeout=300, write_timeout=300)
 
@@ -61,7 +64,7 @@ async def main():
         return
     vid, title, descr = item
     logging.info("found ended live: %s", title)
-    file = download_720p(vid, title)
+    file = download_audio(vid, title)
     logging.info("uploading to Telegram …")
     await send_telegram(file, title, descr)
     os.remove(file)
