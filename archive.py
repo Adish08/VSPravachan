@@ -27,22 +27,40 @@ def get_latest_ended_live():
     return None
 
 def download_audio(video_id, title):
+    temp_file = "audio_temp.m4a"
     outfile = "audio.m4a"
-    cmd = [
+    
+    # Step 1: Download audio
+    cmd_download = [
         "yt-dlp",
         "--cookies", "cookies.txt",
         "-f", "bestaudio/best",
-        "-x",  # extract audio
+        "-x",
         "--audio-format", "m4a",
-        "--postprocessor-args", "ffmpeg:-ac 1 -ar 22050 -b:a 24k",  # mono, 22kHz, 24kbps
-        "-o", "audio.%(ext)s",
+        "-o", temp_file,
         "--no-progress",
         f"https://www.youtube.com/watch?v={video_id}"
     ]
-    subprocess.run(cmd, check=True)
-    # After post-processing, the file will be audio.m4a
+    subprocess.run(cmd_download, check=True)
+    logging.info("download complete, re-encoding to reduce size...")
+    
+    # Step 2: Re-encode with aggressive compression
+    cmd_compress = [
+        "ffmpeg", "-i", temp_file,
+        "-ac", "1",           # mono
+        "-ar", "22050",       # 22kHz sample rate
+        "-b:a", "16k",        # 16kbps bitrate
+        "-y",                 # overwrite output
+        outfile
+    ]
+    subprocess.run(cmd_compress, check=True, capture_output=True)
+    
+    # Clean up temp file
+    if os.path.exists(temp_file):
+        os.remove(temp_file)
+    
     sz = os.path.getsize(outfile) / 1024 / 1024
-    logging.info("file size: %.1f MB", sz)
+    logging.info("compressed file size: %.1f MB", sz)
     if sz > 48:
         raise RuntimeError("audio > 48 MB – aborting to stay under Telegram bot limit")
     return outfile
