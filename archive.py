@@ -31,6 +31,7 @@ def download_720p(video_id, title):
     outfile = "video.mp4"
     cmd = [
         "yt-dlp",
+        "--cookies", "cookies.txt",
         "-f", "bestvideo[height<=720]+bestaudio[ext=m4a]/best[height<=720]",
         "--merge-output-format", "mp4",
         "-o", outfile,

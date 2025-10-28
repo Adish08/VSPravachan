@@ -17,9 +17,56 @@ jobs:
         uses: actions/setup-python@v4
         with: { python-version: "3.11" }
 
-      - name: Setup yt-dlp + FFmpeg
-        uses: AnimMouse/setup-yt-dlp@v3
-        with: { ffmpeg: true }
+      - name: Setup browser & export cookies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y chromium-browser chromium-chromedriver
+          pip install yt-dlp selenium selenium-stealth google-auth-oauthlib
+
+      - name: Login to YouTube and dump cookies
+        env:
+          EMAIL:  ${{ secrets.GOOGLE_EMAIL }}
+          PASS:   ${{ secrets.GOOGLE_PASSWORD }}
+        run: |
+          python - << 'PY'
+          import os, json, time, pickle
+          from selenium import webdriver
+          from selenium.webdriver.common.by import By
+          from selenium.webdriver.chrome.options import Options
+          from selenium_stealth import stealth
+
+          opt = Options()
+          opt.add_argument("--no-sandbox")
+          opt.add_argument("--disable-dev-shm-usage")
+          opt.add_argument("--headless=new")
+          driver = webdriver.Chrome(options=opt)
+          stealth(driver,
+              languages=["en-US", "en"],
+              vendor="Google Inc.",
+              platform="Win32",
+              webgl_vendor="Intel Inc.",
+              renderer="Intel Iris OpenGL Engine",
+              fix_hairline=True)
+
+          driver.get("https://accounts.google.com/signin")
+          driver.find_element(By.ID, "identifierId").send_keys(os.getenv("EMAIL"))
+          driver.find_element(By.ID, "identifierNext").click()
+          time.sleep(3)
+          driver.find_element(By.NAME, "Passwd").send_keys(os.getenv("PASS"))
+          driver.find_element(By.ID, "passwordNext").click()
+          time.sleep(5)               # 2FA / OTP if you have it
+          driver.get("https://www.youtube.com")
+          time.sleep(3)
+
+          # dump cookies in Netscape format for yt-dlp
+          with open("cookies.txt", "w") as f:
+              for c in driver.get_cookies():
+                  f.write(f"{c['domain']}\tTRUE\t{c['path']}\t"
+                          f"{'TRUE' if c['secure'] else 'FALSE'}\t"
+                          f"{c['expiry'] or 0}\t{c['name']}\t{c['value']}\n")
+          driver.quit()
+          print("✅ cookies.txt written")
+          PY
 
       - name: Install Python deps
         run: pip install python-telegram-bot google-api-python-client packaging
