@@ -31,10 +31,11 @@ def download_audio(video_id, title):
     cmd = [
         "yt-dlp",
         "--cookies", "cookies.txt",
-        "-f", "bestaudio",
-        "--extract-audio",
+        "-f", "bestaudio/best",
+        "-x",  # extract audio
         "--audio-format", "m4a",
         "--audio-quality", "32k",
+        "--postprocessor-args", "ffmpeg:-b:a 32k",
         "-o", outfile,
         "--no-progress",
         f"https://www.youtube.com/watch?v={video_id}"
