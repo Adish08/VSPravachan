@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import os, subprocess, logging, datetime
+import os, subprocess, logging, datetime, asyncio
 from telegram import Bot
 from googleapiclient.discovery import build
 
@@ -9,7 +9,6 @@ CHAT_ID      = os.getenv("CHAT_ID")
 API_KEY      = os.getenv("YOUTUBE_API_KEY")
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
-bot = Bot(BOT_TOKEN)
 youtube = build("youtube", "v3", developerKey=API_KEY)
 
 def get_latest_ended_live():
@@ -45,16 +44,17 @@ def download_720p(video_id, title):
         raise RuntimeError("video > 1.9 GB – aborting to avoid artifact limit")
     return outfile
 
-def send_telegram(file_path, title, descr):
+async def send_telegram(file_path, title, descr):
+    bot = Bot(BOT_TOKEN)
     if len(descr) > 900:
         descr = descr[:900] + "…"
     with open(file_path, "rb") as fh:
-        bot.send_video(CHAT_ID, video=fh,
-                       caption=f"<b>{title}</b>\n\n{descr}",
-                       parse_mode="HTML",
-                       read_timeout=300, write_timeout=300)
+        await bot.send_video(CHAT_ID, video=fh,
+                             caption=f"<b>{title}</b>\n\n{descr}",
+                             parse_mode="HTML",
+                             read_timeout=300, write_timeout=300)
 
-def main():
+async def main():
     item = get_latest_ended_live()
     if not item:
         logging.info("no new ended live-stream")
@@ -63,9 +63,9 @@ def main():
     logging.info("found ended live: %s", title)
     file = download_720p(vid, title)
     logging.info("uploading to Telegram …")
-    send_telegram(file, title, descr)
+    await send_telegram(file, title, descr)
     os.remove(file)
     logging.info("done")
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
