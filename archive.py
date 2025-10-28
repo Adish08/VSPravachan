@@ -36,11 +36,12 @@ def download_audio(video_id, title):
         "--audio-format", "m4a",
         "--audio-quality", "32k",
         "--postprocessor-args", "ffmpeg:-b:a 32k",
-        "-o", outfile,
+        "-o", "audio.%(ext)s",  # let yt-dlp handle extension during conversion
         "--no-progress",
         f"https://www.youtube.com/watch?v={video_id}"
     ]
     subprocess.run(cmd, check=True)
+    # After post-processing, the file will be audio.m4a
     sz = os.path.getsize(outfile) / 1024 / 1024
     logging.info("file size: %.1f MB", sz)
     if sz > 45:
@@ -65,11 +66,23 @@ async def main():
         return
     vid, title, descr = item
     logging.info("found ended live: %s", title)
-    file = download_audio(vid, title)
-    logging.info("uploading to Telegram …")
-    await send_telegram(file, title, descr)
-    os.remove(file)
-    logging.info("done")
+    
+    try:
+        file = download_audio(vid, title)
+        logging.info("download complete, file: %s", file)
+        
+        if not os.path.exists(file):
+            raise FileNotFoundError(f"Downloaded file not found: {file}")
+        
+        logging.info("uploading to Telegram …")
+        await send_telegram(file, title, descr)
+        logging.info("upload complete")
+        
+        os.remove(file)
+        logging.info("done - file cleaned up")
+    except Exception as e:
+        logging.error("Error: %s", e, exc_info=True)
+        raise
 
 if __name__ == "__main__":
     asyncio.run(main())
