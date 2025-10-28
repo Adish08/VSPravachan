@@ -22,7 +22,7 @@ jobs:
         with: { ffmpeg: true }
 
       - name: Install Python deps
-        run: pip install python-telegram-bot google-api-python-client
+        run: pip install python-telegram-bot google-api-python-client packaging
 
       - name: Download & Upload
         env:
