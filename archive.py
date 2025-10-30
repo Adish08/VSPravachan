@@ -2,6 +2,7 @@
 import os, subprocess, logging, datetime, asyncio
 from telegram import Bot
 from googleapiclient.discovery import build
+import json
 
 CHANNEL_ID   = os.getenv("CHANNEL_ID")
 BOT_TOKEN    = os.getenv("BOT_TOKEN")
@@ -10,6 +11,26 @@ API_KEY      = os.getenv("YOUTUBE_API_KEY")
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 youtube = build("youtube", "v3", developerKey=API_KEY)
+
+PROCESSED_FILE = "processed_videos.json"
+
+def load_processed_videos():
+    """Load the list of already processed video IDs"""
+    if os.path.exists(PROCESSED_FILE):
+        try:
+            with open(PROCESSED_FILE, 'r') as f:
+                return set(json.load(f))
+        except (json.JSONDecodeError, IOError):
+            return set()
+    return set()
+
+def save_processed_video(video_id):
+    """Add a video ID to the processed list"""
+    processed = load_processed_videos()
+    processed.add(video_id)
+    with open(PROCESSED_FILE, 'w') as f:
+        json.dump(list(processed), f, indent=2)
+    logging.info("Marked video %s as processed", video_id)
 
 def get_latest_ended_live():
     req = youtube.search().list(
@@ -135,6 +156,12 @@ async def main():
         logging.info("no new ended live-stream")
         return
     
+    # Check if this video has already been processed
+    processed_videos = load_processed_videos()
+    if video_info['id'] in processed_videos:
+        logging.info("Video %s already processed, skipping", video_info['id'])
+        return
+    
     logging.info("found ended live: %s", video_info['title'])
     
     try:
@@ -147,6 +174,9 @@ async def main():
         logging.info("uploading to Telegram …")
         await send_telegram(file, video_info, file_size_mb)
         logging.info("upload complete")
+        
+        # Mark video as processed after successful upload
+        save_processed_video(video_info['id'])
         
         os.remove(file)
         logging.info("done - file cleaned up")
